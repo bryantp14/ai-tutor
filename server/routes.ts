@@ -1,17 +1,17 @@
+import { appendToSheet } from "./sheets"; // ✅ Using the file we created
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+// import { storage } from "./storage"; // ❌ Commented out to prevent DB crash
 import { api } from "@shared/routes";
 import { z } from "zod";
 import OpenAI from "openai";
 import { lessonData } from "./lessonData";
-import { sheetsLogger } from "./googleSheetsLogger";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerImageRoutes } from "./replit_integrations/image";
 
-// Initialize OpenAI with Replit integration env vars
+// Initialize OpenAI - Updated to look for YOUR key first
 const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || "dummy-key",
+  apiKey: process.env.OPENAI_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY || "dummy-key",
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://api.openai.com/v1",
 });
 
@@ -27,18 +27,7 @@ export async function registerRoutes(
     try {
       const { message, unitId, history } = api.chat.sendMessage.input.parse(req.body);
 
-      // Log user message to database and Google Sheets
-      await storage.logChat({
-        role: "user",
-        content: message,
-        unitId: unitId
-      });
-      await sheetsLogger.logToSheet({
-        timestamp: new Date().toISOString(),
-        role: "user",
-        content: message,
-        unitId: unitId
-      });
+      // --- DELETED: The "Log user message" block that was crashing the DB ---
 
       // Get context from lesson data
       const context = lessonData[unitId] || "General Chinese practice.";
@@ -60,39 +49,37 @@ export async function registerRoutes(
 
       // Call OpenAI
       const response = await openai.chat.completions.create({
-        model: "gpt-4o", // Using a capable model for language tutoring
+        model: "gpt-4o", 
         messages: messages,
       });
 
       const aiContent = response.choices[0].message.content || "Sorry, I couldn't understand that.";
 
-      // Log AI response to database and Google Sheets
-      await storage.logChat({
-        role: "assistant",
-        content: aiContent,
-        unitId: unitId
-      });
-      await sheetsLogger.logToSheet({
-        timestamp: new Date().toISOString(),
-        role: "assistant",
-        content: aiContent,
-        unitId: unitId
-      });
-
+      // --- NEW: Send response to User FIRST (Speed) ---
       res.json({
         message: aiContent,
         role: "assistant"
       });
 
+      // --- NEW: Log to Google Sheets in background (User + AI in one row) ---
+      await appendToSheet({
+        unit: unitId,
+        userMessage: message,
+        aiResponse: aiContent
+      });
+      
     } catch (err) {
       console.error("Chat error:", err);
-      if (err instanceof z.ZodError) {
-        res.status(400).json({
-          message: "Invalid input",
-          field: err.errors[0].path.join('.')
-        });
-      } else {
-        res.status(500).json({ message: "Internal server error" });
+      // Only send error response if we haven't sent the success response yet
+      if (!res.headersSent) {
+        if (err instanceof z.ZodError) {
+          res.status(400).json({
+            message: "Invalid input",
+            field: err.errors[0].path.join('.')
+          });
+        } else {
+          res.status(500).json({ message: "Internal server error" });
+        }
       }
     }
   });
