@@ -1,0 +1,39 @@
+Build a complete, functional web application for an "Elementary Chinese AI Tutor" based on the following specifications.
+
+**Tech Stack:**
+- Frontend: React (Vite), Tailwind CSS, Lucide-React (for icons).
+- Backend: Node.js with Express (to handle API requests securely).
+- AI: OpenAI API (gpt-4o or gpt-3.5-turbo).
+- Database/Logging: Google Sheets API (structure the code for this, but mock it for now so the app runs immediately without credentials).
+
+**1. Visual Design & UI (Desktop First):**
+- Create a layout with a permanent **Left Sidebar** and a **Main Chat Area**.
+- **Header:** Display the school name/logo placeholder and the title "Elementary Chinese A.I. Tutor" with a centralized Chinese greeting (e.g., "有什么可以帮你的吗？").
+- **Sidebar:**
+  - Section 1: "Previous Chats" (list of clickable past sessions).
+  - Section 2: "Units" (e.g., "Unit 1: Greetings", "Practice: Ordering Food").
+  - Use a clean, academic, yet "polished and delightful" color scheme (warm beiges, soft reds/grays) similar to a high-end textbook.
+- **Chat Interface:**
+  - Display a clear "Disclaimer" message at the start: "Do not share personal information/data."
+  - Chat bubbles: Distinct styles for User (right) and AI (left).
+  - Input area: A clean text box at the bottom with a "Send" button and a microphone icon (visual only).
+
+**2. Core Functionality (Frontend):**
+- **State Management:** Keep track of the chat history and the current selected "Lesson/Unit".
+- **Local Storage:** Save the "Previous Chats" to the browser's localStorage so the user sees them when they return (anonymous persistence).
+- **Context Selection:** When a user clicks a "Unit" in the sidebar (e.g., "Unit 1"), update the system context sent to the AI to focus only on vocabulary from that unit.
+
+**3. Backend & AI Logic (Server):**
+- Create an API route `/api/chat`.
+- **System Prompt:** When sending the request to OpenAI, use this specific system instruction:
+  "You are an AI Chinese Tutor for elementary students. You must ONLY use vocabulary and grammar structures found in the provided context. You are helpful and patient. Do not do the student's homework; offer hints instead. If a student makes a mistake, gently label it and guide them to correct it. Context: [Insert Selected Unit Content Here]."
+- **RAG/Context:** Create a file `lessonData.js` containing mock text content for "Unit 1: Greetings" and "Unit 2: Family" that the backend injects into the system prompt.
+- **Logging:** Create a function to log every chat message (User and AI) to a backend service. For now, just log to `console.log`, but add comments showing where the Google Sheets API code would go.
+
+**4. Implementation Steps:**
+- Initialize the React project with Tailwind.
+- Create the components: `Sidebar`, `ChatWindow`, `MessageBubble`, `InputArea`.
+- Set up the Express server to proxy calls to OpenAI.
+- ensure the app is responsive but optimized for Desktop.
+
+**Important:** Please check for an `OPENAI_API_KEY` in the secrets. If it's missing, use a mock response so I can see the UI immediately.
