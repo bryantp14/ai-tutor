@@ -1,5 +1,5 @@
 // server/data/lesson1.ts
-import { Module } from "./types";
+import { Module } from "./types"; // This imports the "Module" interface from your current types.ts
 
 export const lesson1: Module = {
   id: "unit-1",

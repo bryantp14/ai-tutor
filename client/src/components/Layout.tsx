@@ -9,7 +9,10 @@ import {
   GraduationCap, 
   History,
   ChevronRight,
-  PlusCircle
+  PlusCircle,
+  Trash2,
+  Sparkles, // Used for the proverb box
+  RefreshCw // Used for the visual hint to cycle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
@@ -21,13 +24,48 @@ interface LayoutProps {
   savedChats: { id: string; title: string; date: string }[];
   onLoadChat: (id: string) => void;
   onNewChat: () => void;
+  onDeleteChat: (id: string) => void;
 }
 
-// ✅ 关键修改：这里的 ID 必须和 server/lessonData.ts 里的 Key 完全一致（包括空格和标点）
+// ✅ The collection of Proverbs
+const PROVERBS = [
+  { chinese: "学而时习之，不亦说乎？", english: "Is it not pleasant to learn with a constant perseverance and application?", pinyin: "Xué ér shí xí zhī..." },
+  { chinese: "千里之行，始于足下。", english: "A journey of a thousand miles begins with a single step.", pinyin: "Qiān lǐ zhī xíng..." },
+  { chinese: "熟能生巧。", english: "Practice makes perfect.", pinyin: "Shú néng shēng qiǎo." },
+  { chinese: "授人以鱼不如授人以渔。", english: "Give a man a fish and you feed him for a day; teach a man to fish and you feed him for a lifetime.", pinyin: "Shòu rén yǐ yú..." },
+  { chinese: "温故而知新。", english: "Review the old to learn the new.", pinyin: "Wēn gù ér zhī xīn." },
+  { chinese: "读万卷书，行万里路。", english: "Read ten thousand books, travel ten thousand miles.", pinyin: "Dú wàn juàn shū..." },
+  { chinese: "世上无难事，只怕有心人。", english: "Nothing is impossible to a willing heart.", pinyin: "Shì shàng wú nán shì..." }
+];
+
 const UNITS = [
-  { id: "Lesson 1: Greetings", label: "Lesson 1: Greetings", sub: "Basic introductions" },
-  { id: "Lesson 2: Family", label: "Lesson 2: Family", sub: "Describing relatives" },
-  { id: "Lesson 3: Dates & Time", label: "Lesson 3: Dates & Time", sub: "Time, dates, invitations" },
+  { 
+    id: "unit-1", 
+    label: "Lesson 1: Greetings", 
+    sub: "Basic introductions" 
+  },
+  { 
+    id: "unit-2", 
+    label: "Lesson 2: Family", 
+    sub: "Describing relatives" 
+  },
+  { 
+    id: "unit-3",
+    label: "Lesson 3: Dates & Time", 
+    sub: "Time, dates, invitations" 
+  },
+  // START OF FIX
+  {
+    id: "unit-4", 
+    label: "Lesson 4: Hobbies", // Changed from 'title' to 'label'
+    sub: "Discussing interests & plans" // Changed from 'description' to 'sub'
+  },
+  {
+    id: "unit-5",
+    label: "Lesson 5: Visiting Friends", // Changed from 'title' to 'label'
+    sub: "Welcoming visitors & offering drinks" // Changed from 'description' to 'sub'
+  }
+  // END OF FIX
 ];
 
 export function Layout({ 
@@ -36,12 +74,29 @@ export function Layout({
   onUnitChange, 
   savedChats, 
   onLoadChat, 
-  onNewChat 
+  onNewChat,
+  onDeleteChat
 }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
 
-  // 辅助函数：即使 currentUnit 是 ID，也能获取显示的 label
+  // ✅ PROVERB STATE
+  // Initialize with a random proverb
+  const [dailyProverb, setDailyProverb] = useState(() => {
+    return PROVERBS[Math.floor(Math.random() * PROVERBS.length)];
+  });
+
+  // ✅ CYCLE FUNCTION
+  const cycleProverb = () => {
+    let newIndex;
+    do {
+      newIndex = Math.floor(Math.random() * PROVERBS.length);
+      // Ensure we don't pick the exact same one twice in a row
+    } while (PROVERBS[newIndex].chinese === dailyProverb.chinese && PROVERBS.length > 1);
+    
+    setDailyProverb(PROVERBS[newIndex]);
+  };
+
   const activeUnitLabel = UNITS.find(u => u.id === currentUnit)?.label || currentUnit;
 
   useEffect(() => {
@@ -57,7 +112,7 @@ export function Layout({
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
-      {/* 移动端遮罩 */}
+      {/* Mobile Mask */}
       <AnimatePresence>
         {isMobile && isSidebarOpen && (
           <motion.div
@@ -70,7 +125,7 @@ export function Layout({
         )}
       </AnimatePresence>
 
-      {/* 侧边栏 */}
+      {/* Sidebar */}
       <AnimatePresence mode="wait">
         {isSidebarOpen && (
           <motion.aside
@@ -82,7 +137,7 @@ export function Layout({
               "fixed lg:static z-50 flex h-full w-80 flex-col border-r border-stone-200 bg-white/80 backdrop-blur-xl shadow-xl lg:shadow-none",
             )}
           >
-            {/* 侧边栏头部 */}
+            {/* Header */}
             <div className="flex h-16 items-center justify-between px-6 border-b border-stone-100">
               <div className="flex items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-lg shadow-primary/20">
@@ -99,9 +154,9 @@ export function Layout({
               )}
             </div>
 
-            {/* 侧边栏内容 */}
+            {/* Sidebar Content */}
             <div className="flex-1 overflow-y-auto py-6 px-4 space-y-8">
-              {/* 操作按钮 */}
+              {/* New Session Button */}
               <div>
                 <Button 
                   onClick={() => {
@@ -115,24 +170,21 @@ export function Layout({
                 </Button>
               </div>
 
-              {/* 课程单元部分 */}
+              {/* Units */}
               <div className="space-y-3">
                 <h3 className="px-2 text-xs font-bold uppercase tracking-wider text-stone-400">
                   Learning Context
                 </h3>
                 <div className="space-y-1">
-
                   {UNITS.map((unit) => (
                     <button
                       key={unit.id}
                       onClick={() => {
-                        // ✅ 发送完整的 ID (例如 "Lesson 1: Greetings") 给后端
                         onUnitChange(unit.id); 
                         if (isMobile) setIsSidebarOpen(false);
                       }}
                       className={cn(
                         "group w-full flex flex-col items-start gap-0.5 px-3 py-2.5 rounded-xl text-left transition-all duration-200",
-                        // ✅ 检查当前选中的 ID 是否匹配
                         currentUnit === unit.id
                           ? "bg-stone-100 text-stone-900 ring-1 ring-stone-200/50 shadow-sm"
                           : "text-stone-500 hover:bg-stone-50 hover:text-stone-900"
@@ -152,7 +204,7 @@ export function Layout({
                 </div>
               </div>
 
-              {/* 历史记录部分 */}
+              {/* History Section */}
               <div className="space-y-3">
                 <h3 className="px-2 text-xs font-bold uppercase tracking-wider text-stone-400 flex items-center gap-2">
                   <History className="h-3 w-3" />
@@ -165,31 +217,60 @@ export function Layout({
                     </div>
                   ) : (
                     savedChats.map((chat) => (
-                      <button
+                      <div
                         key={chat.id}
                         onClick={() => {
                           onLoadChat(chat.id);
                           if (isMobile) setIsSidebarOpen(false);
                         }}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-colors text-left"
+                        className="group relative w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-colors cursor-pointer"
                       >
-                        <MessageSquare className="h-4 w-4 opacity-50 shrink-0" />
-                        <span className="truncate">{chat.title}</span>
-                      </button>
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <MessageSquare className="h-4 w-4 opacity-50 shrink-0" />
+                          <span className="truncate max-w-[160px]">{chat.title}</span>
+                        </div>
+
+                        {/* Delete Button (Only visible on hover) */}
+                        <button
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             onDeleteChat(chat.id);
+                           }}
+                           className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-red-500 hover:bg-red-50 p-1 rounded-md transition-all absolute right-2 bg-white/80 backdrop-blur-sm"
+                           title="Delete Chat"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
                     ))
                   )}
                 </div>
               </div>
             </div>
             
-            {/* 侧边栏底部 */}
+            {/* Footer with Proverb Cycler */}
             <div className="border-t border-stone-100 p-4">
-              <div className="rounded-xl bg-primary/5 p-4 border border-primary/10">
-                <p className="text-xs text-primary/80 leading-relaxed font-medium">
-                  "Learning is a treasure that will follow its owner everywhere."
+              <div 
+                onClick={cycleProverb}
+                className="group relative rounded-xl bg-primary/5 p-4 border border-primary/10 cursor-pointer hover:bg-primary/10 transition-all duration-300"
+                title="Click for a new proverb"
+              >
+                {/* Decoration Icons */}
+                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <RefreshCw className="h-3 w-3 text-primary/50" />
+                </div>
+                <div className="absolute -top-1 -left-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Sparkles className="h-4 w-4 text-primary fill-primary/20" />
+                </div>
+
+                <p className="font-serif font-bold text-stone-800 text-sm mb-1">
+                    {dailyProverb.chinese}
                 </p>
-                <p className="mt-2 text-[10px] text-primary/60 font-serif uppercase tracking-widest">
-                   Chinese Proverb
+                <p className="text-xs text-stone-400 mb-2 font-mono">
+                    {dailyProverb.pinyin}
+                </p>
+                <p className="text-xs text-primary/80 leading-relaxed font-medium">
+                  "{dailyProverb.english}"
                 </p>
               </div>
             </div>
@@ -197,7 +278,7 @@ export function Layout({
         )}
       </AnimatePresence>
 
-      {/* 主内容区域 */}
+      {/* Main Content */}
       <main className="flex-1 flex flex-col h-full relative z-0">
         <header className="h-16 flex items-center px-4 lg:px-8 border-b border-stone-100 bg-white/50 backdrop-blur-sm sticky top-0 z-30">
           {!isSidebarOpen && (
