@@ -60,33 +60,47 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
+// --- NEW SETUP LOGIC ---
+
+// We create a setup function so we can wait for it
+let isSetup = false;
+async function setupApp() {
+  if (isSetup) return;
+  
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
     res.status(status).json({ message });
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   } else {
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
   }
+  isSetup = true;
+}
 
-  // EDITED: Changed default port to 5001 and host to 127.0.0.1 for Mac compatibility
-  // EDITED: Simplified listen command to fix ENOTSUP error on Mac
-  const port = parseInt(process.env.PORT || "5001", 10);
-  
-  // We removed the { reusePort: true } object causing the crash
-  httpServer.listen(port, "0.0.0.0", () => {
-    log(`serving on port ${port}`);
-  });
-})();
+// --- VERCEL HANDLER ---
+// This is what Vercel needs. It ensures setup is done before handling the request.
+export default async function handler(req: any, res: any) {
+  await setupApp();
+  app(req, res);
+}
+
+// --- LOCAL SERVER START ---
+// Only listen if we are running locally (not imported as a module)
+// This prevents Vercel from trying to bind a port and failing
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  (async () => {
+    await setupApp();
+    const port = parseInt(process.env.PORT || "5001", 10);
+    httpServer.listen(port, "0.0.0.0", () => {
+      log(`serving on port ${port}`);
+    });
+  })();
+}
