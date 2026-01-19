@@ -200,7 +200,17 @@ export async function registerRoutes(
 
   app.post(api.chat.sendMessage.path, async (req, res) => {
     try {
+      // ADD THESE DEBUG LOGS RIGHT HERE AT THE START
+      console.log('=== CHAT REQUEST DEBUG ===');
+      console.log('API Key exists:', !!process.env.OPENROUTER_API_KEY);
+      console.log('API Key length:', process.env.OPENROUTER_API_KEY?.length);
+      console.log('API Key first 15 chars:', process.env.OPENROUTER_API_KEY?.substring(0, 15));
+      console.log('Request body:', req.body);
+      console.log('========================');
+  
       const { message, unitId, history } = api.chat.sendMessage.input.parse(req.body);
+  
+      // ... rest of your existing code
 
       // ✅ 4. Fetch the raw lesson data safely
       const requestedId = unitId || "unit-1";
