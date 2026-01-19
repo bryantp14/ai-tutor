@@ -61,8 +61,6 @@ app.use((req, res, next) => {
 });
 
 // --- NEW SETUP LOGIC ---
-
-// We create a setup function so we can wait for it
 let isSetup = false;
 async function setupApp() {
   if (isSetup) return;
@@ -73,10 +71,10 @@ async function setupApp() {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
     res.status(status).json({ message });
-    throw err;
+    console.error('Error:', err);
   });
 
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
     serveStatic(app);
   } else {
     const { setupVite } = await import("./vite");
@@ -85,22 +83,16 @@ async function setupApp() {
   isSetup = true;
 }
 
-// --- VERCEL HANDLER ---
-// This is what Vercel needs. It ensures setup is done before handling the request.
-export default async function handler(req: any, res: any) {
-  await setupApp();
-  app(req, res);
-}
+// Initialize setup immediately for Vercel
+setupApp().catch(console.error);
 
 // --- LOCAL SERVER START ---
-// Only listen if we are running locally (not imported as a module)
-// This prevents Vercel from trying to bind a port and failing
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-  (async () => {
-    await setupApp();
-    const port = parseInt(process.env.PORT || "5001", 10);
-    httpServer.listen(port, "0.0.0.0", () => {
-      log(`serving on port ${port}`);
-    });
-  })();
+if (!process.env.VERCEL && require.main === module) {
+  const port = parseInt(process.env.PORT || "5001", 10);
+  httpServer.listen(port, "0.0.0.0", () => {
+    log(`serving on port ${port}`);
+  });
 }
+
+// Export the Express app for Vercel
+export default app;
