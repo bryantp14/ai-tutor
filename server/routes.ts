@@ -33,6 +33,9 @@ const openai = new OpenAI({
   },
 });
 
+console.log('OpenRouter API Key exists:', !!process.env.OPENROUTER_API_KEY);
+console.log('First 10 chars:', process.env.OPENROUTER_API_KEY?.substring(0, 10));
+
 // ✅ 3. Updated Helper: Convert raw Lesson Data into the String format your prompt needs
 function formatSystemInstruction(lesson: Module): string {
   
