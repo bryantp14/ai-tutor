@@ -1,44 +1,61 @@
 import { lessons } from "./lessons";
 import OpenAI from "openai";
 
+// 1. Define the Handler
 export default async function handler(req: any, res: any) {
-  // 1. Basic Setup Check
+  
+  // 2. Set CORS Headers (Crucial for frontend to talk to backend)
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
+
+  // 3. Handle Pre-flight Check
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
+  // 4. Ensure POST method
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
   }
 
   try {
-    // 2. DIAGNOSTIC: Check API Key immediately
+    // 5. Check API Key INSIDE the function
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
-      throw new Error("CRITICAL: OPENROUTER_API_KEY is missing from Vercel Environment Variables.");
+      console.error("Missing API Key");
+      return res.status(200).json({ 
+        role: "assistant", 
+        message: "❌ System Error: OPENROUTER_API_KEY is missing in Vercel settings." 
+      });
     }
 
-    // 3. DIAGNOSTIC: Check Lessons Data
-    if (!lessons) {
-      throw new Error("CRITICAL: 'lessons' failed to import. Check api/lessons.ts.");
-    }
-    
-    // Check if the requested unit exists
-    const { message, unitId, history } = req.body;
-    const requestedId = unitId || "unit-1";
-    const currentLesson = lessons[requestedId];
-
-    if (!currentLesson) {
-       // Just a warning, not a crash
-       console.warn(`Lesson ${requestedId} not found, defaulting...`);
-    }
-
-    // 4. Initialize OpenAI
+    // 6. Connect to OpenAI (Only happens now)
     const openai = new OpenAI({
       apiKey: apiKey,
       baseURL: "https://openrouter.ai/api/v1",
-      defaultHeaders: { "X-Title": "My Chinese Tutor App" },
+      defaultHeaders: { "X-Title": "Chinese Tutor App" },
     });
 
-    // 5. Run the Chat
-    const systemPrompt = `You are a helpful Chinese Tutor. Current Lesson: ${currentLesson?.title || "General"}`;
+    // 7. Get Data from Request
+    const { message, unitId, history } = req.body;
     
+    // Default to unit-1 if id is missing or invalid
+    const requestedId = unitId || "unit-1";
+    const currentLesson = lessons[requestedId] || lessons["unit-1"];
+
+    // 8. Create System Prompt
+    const systemPrompt = `You are a helpful Chinese Tutor. 
+    Current Lesson Context: ${currentLesson?.title || "General Chat"}.
+    Vocabulary to use: ${currentLesson?.vocabulary?.map((v: any) => v.word).join(", ") || "Simple words"}.
+    Keep responses encouraging and suitable for a beginner.`;
+
+    // 9. Call AI
     const response = await openai.chat.completions.create({
       model: "openai/gpt-4o",
       messages: [
@@ -48,18 +65,17 @@ export default async function handler(req: any, res: any) {
       ] as any,
     });
 
-    const aiContent = response.choices[0].message.content || "No response generated.";
+    const aiContent = response.choices[0].message.content || "Sorry, I couldn't generate a response.";
 
+    // 10. Send Success Response
     return res.status(200).json({ message: aiContent, role: "assistant" });
 
   } catch (error: any) {
-    console.error("SERVER CRASH:", error);
-    
-    // THIS IS THE FIX: Instead of 500, return the error as a chat message
-    // so you can see exactly what is wrong in the UI.
+    console.error("Handler Error:", error);
+    // Send error to chat UI so you can see it
     return res.status(200).json({ 
-      message: `❌ SYSTEM ERROR: ${error.message}`, 
-      role: "assistant" 
+      role: "assistant", 
+      message: `❌ Error: ${error.message}` 
     });
   }
 }
