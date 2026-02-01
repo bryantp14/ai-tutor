@@ -133,16 +133,8 @@ const lesson1: Lesson = {
   ]
 };
 
-// --- PASTE LESSON 2 BELOW THIS LINE ---
-// const lesson2: Lesson = { ... };
 
-// --- PASTE LESSON 3 BELOW THIS LINE ---
-// const lesson3: Lesson = { ... };
-
-
-
-
-export const lesson2: Lesson = {
+const lesson2: Lesson = {
   id: "unit-2",
   title: "Lesson 2: Family",
   vocabulary: [
@@ -348,7 +340,7 @@ export const lesson2: Lesson = {
   ]
 };
 
-export const lesson3: Lesson = {
+const lesson3: Lesson = {
   id: "unit-3",
   title: "Lesson 3: Dates and Time",
   vocabulary: [
@@ -557,7 +549,7 @@ export const lesson3: Lesson = {
   ]
 };
 
-export const lesson4: Lesson = {
+const lesson4: Lesson = {
   id: "unit-4",
   title: "Lesson 4: Hobbies and Weekend Activities",
   vocabulary: [
@@ -790,7 +782,7 @@ export const lesson4: Lesson = {
   ]
 };
 
-export const lesson5: Lesson = {
+const lesson5: Lesson = {
   id: "unit-5",
   title: "Lesson 5: Visiting Friends",
   vocabulary: [
