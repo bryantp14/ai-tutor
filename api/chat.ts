@@ -10,7 +10,7 @@ const openai = new OpenAI({
   },
 });
 
-// --- YOUR SPECIAL PROMPT LOGIC (Included directly here to prevent import errors) ---
+// --- YOUR SPECIAL PROMPT LOGIC ---
 function formatSystemInstruction(lesson: any): string {
   const vocab = lesson.vocabulary || [];
   const grammar = lesson.grammar || [];
@@ -96,12 +96,9 @@ export default async function handler(req: any, res: any) {
     }
 
     if (!currentLesson) {
-       console.error("Lesson not found!"); 
-       // Create a dummy lesson to prevent crash
+       // Create a dummy lesson to prevent crash if data is totally missing
        currentLesson = { title: "Basic Chat", vocabulary: [], grammar: [] };
     }
-
-    console.log(`[API] Chatting about: ${currentLesson.title}`);
 
     // 2. Prepare Messages
     const systemPrompt = formatSystemInstruction(currentLesson);
