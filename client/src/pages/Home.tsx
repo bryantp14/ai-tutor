@@ -159,6 +159,7 @@ export default function Home() {
     // This ensures the sidebar stays highlighted, but the server gets the correct data key.
     const backendUnitId = currentUnit.replace("lesson", "unit");
 
+    console.log("Sending to AI:", backendUnitId);
     try {
       const response = await chatMutation.mutateAsync({
         message: userMessage,

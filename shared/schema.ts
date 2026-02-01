@@ -21,7 +21,8 @@ export type ChatLog = typeof chat_logs.$inferSelect;
 // Request/Response types for the API
 export const chatRequestSchema = z.object({
   message: z.string(),
-  unitId: z.string(),
+  // ✅ CHANGE: Added .optional() so it doesn't crash if unitId is missing
+  unitId: z.string().optional(), 
   history: z.array(z.object({
     role: z.enum(["user", "assistant"]),
     content: z.string()
@@ -37,4 +38,5 @@ export const chatResponseSchema = z.object({
 
 export type ChatResponse = z.infer<typeof chatResponseSchema>;
 
-export * from "./models/chat";
+// Remove this line if you don't actually have a models/chat file
+// export * from "./models/chat";

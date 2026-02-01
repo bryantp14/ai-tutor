@@ -8,22 +8,9 @@ import { systemInstruction } from "./systemInstruction";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerImageRoutes } from "./replit_integrations/image";
 
-// ✅ Import all lesson data (Lessons 1-5)
-import { lesson1 } from "../api/data/lesson1"; 
-import { lesson2 } from "../api/data/lesson2"; 
-import { lesson3 } from "../api/data/lesson3"; 
-import { lesson4 } from "../api/data/lesson4"; 
-import { lesson5 } from "../api/data/lesson5";
-import { Module } from "../api/data/types";
-
-// ✅ Map IDs to files
-const lessons: Record<string, Module> = {
-  "unit-1": lesson1,
-  "unit-2": lesson2,
-  "unit-3": lesson3,
-  "unit-4": lesson4,
-  "unit-5": lesson5,
-};
+// ✅ FIX: Import the function from our new Registry
+// We don't need to import individual lessons anymore!
+import { getLessonData } from "../api/lessons";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY, 
@@ -34,22 +21,23 @@ const openai = new OpenAI({
 });
 
 // Helper: Convert raw Lesson Data into the System Prompt
-function formatSystemInstruction(lesson: Module): string {
+// We use 'any' for the type here to avoid conflicts between 'Module' and 'Lesson' types
+function formatSystemInstruction(lesson: any): string {
   
   // -- A. Format Vocabulary --
   const hasVocab = lesson.vocabulary && lesson.vocabulary.length > 0;
   const vocabList = hasVocab 
-    ? lesson.vocabulary.map(v => `${v.word} (${v.pinyin}) - ${v.english}`).join("\n")
+    ? lesson.vocabulary.map((v: any) => `${v.word} (${v.pinyin}) - ${v.english}`).join("\n")
     : "ERROR: NO VOCABULARY LOADED";
 
   // -- B. Format Grammar --
-  const grammarList = lesson.grammar.map(g => {
+  const grammarList = lesson.grammar.map((g: any) => {
     const points = g.points.map((p: any) => {
       // Handle examples safely
-      const exStr = p.examples.map((ex: any) => {
+      const exStr = p.examples ? p.examples.map((ex: any) => {
         if (typeof ex === 'string') return `   * ${ex}`;
         return `   * Q: ${ex.question || ''} A: ${ex.answer || ''} (St: ${ex.statement || ''})`;
-      }).join("\n");
+      }).join("\n") : "";
 
       return `**${p.structure || 'Rule'}**\nUsage: ${p.usage || ''}\nExamples:\n${exStr}`;
     }).join("\n\n");
@@ -57,8 +45,8 @@ function formatSystemInstruction(lesson: Module): string {
   }).join("\n\n") || "No grammar specified";
 
   // -- C. Format Patterns --
-  const patternList = lesson.patterns?.map(p => 
-    `Function: ${p.function}\nPatterns:\n${p.patterns.map(s => `- ${s}`).join("\n")}`
+  const patternList = lesson.patterns?.map((p: any) => 
+    `Function: ${p.function}\nPatterns:\n${p.patterns.map((s: string) => `- ${s}`).join("\n")}`
   ).join("\n\n") || "None specified";
 
   // -- D. Build the Final Prompt --
@@ -196,23 +184,24 @@ export async function registerRoutes(
 
   app.post(api.chat.sendMessage.path, async (req, res) => {
     try {
+      // ✅ Parse body - make sure shared/routes.ts includes unitId in the schema!
       const { message, unitId, history } = api.chat.sendMessage.input.parse(req.body);
 
-      // ✅ Fetch the raw lesson data safely
+      // ✅ FIX: Use the Registry Function
+      // This guarantees we get the data from api/lessons.ts
       const requestedId = unitId || "unit-1";
-      const currentLesson = lessons[requestedId] || lesson1; // Fallback to lesson1 if ID not found
+      const currentLesson = getLessonData(requestedId);
       
-      // DEBUG: Log what we're getting
+      // DEBUG: Log to server console to verify it works
       console.log("=== LESSON CONTEXT DEBUG ===");
       console.log("Unit ID:", requestedId);
       console.log("Topic:", currentLesson.title);
       console.log("Vocab Count:", currentLesson.vocabulary?.length || 0);
       console.log("===========================");
       
-      // ✅ Convert it to text for the AI
       const systemMessageContent = formatSystemInstruction(currentLesson);
 
-      const recentHistory = (history || []).slice(-10).map(msg => ({
+      const recentHistory = (history || []).slice(-10).map((msg: any) => ({
         role: msg.role as "user" | "assistant", 
         content: msg.content
       }));
@@ -236,11 +225,14 @@ export async function registerRoutes(
         role: "assistant"
       });
 
-      await appendToSheet({
-        unit: unitId,
-        userMessage: message,
-        aiResponse: aiContent
-      });
+      // Optional: Save to sheet if configured
+      if (typeof appendToSheet === 'function') {
+        await appendToSheet({
+            unit: unitId || "unit-1",
+            userMessage: message,
+            aiResponse: aiContent
+        });
+      }
       
     } catch (err) {
       console.error("Chat error:", err);
