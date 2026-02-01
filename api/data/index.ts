@@ -1,10 +1,11 @@
 import { lesson1 } from "./lesson1";
 import { lesson2 } from "./lesson2";
-import { lesson3 } from "./lesson3";
+// If you haven't created lesson3 yet, you might need to comment these out
+import { lesson3 } from "./lesson3"; 
 import { Module } from "./types";
 
 // Register all available lessons here
-const lessons: Record<string, Module> = {
+export const lessons: Record<string, Module> = {
   [lesson1.id]: lesson1,
   [lesson2.id]: lesson2,
   [lesson3.id]: lesson3,
@@ -23,13 +24,9 @@ export function getLessonContext(unitId: string) {
     };
   }
 
-  // Schema Normalization:
-  // Combine 'patterns' (Lesson 1/2) and 'key_sentence_patterns' (Lesson 3)
-  // so the AI prompt gets the data regardless of which field is used.
-  const allPatterns = [
-    ...(lesson.patterns || []), 
-    ...(lesson.key_sentence_patterns || [])
-  ];
+  // ✅ FIX: Directly use 'patterns'. 
+  // If lesson3 uses 'key_sentence_patterns', you must rename it to 'patterns' inside lesson3.ts
+  const allPatterns = lesson.patterns || [];
 
   return {
     topic: lesson.title,
