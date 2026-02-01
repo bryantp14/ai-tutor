@@ -8,15 +8,15 @@ import { systemInstruction } from "./systemInstruction";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerImageRoutes } from "./replit_integrations/image";
 
-// ✅ 1. Import your new data and types
+// ✅ Import all lesson data (Lessons 1-5)
 import { lesson1 } from "./data/lesson1"; 
-import { lesson2 } from "./data/lesson2"; // ✅ Created
-import { lesson3 } from "./data/lesson3"; // ✅ Created
-import { lesson4 } from "./data/lesson4"; // ✅ Created
+import { lesson2 } from "./data/lesson2"; 
+import { lesson3 } from "./data/lesson3"; 
+import { lesson4 } from "./data/lesson4"; 
 import { lesson5 } from "./data/lesson5";
 import { Module } from "./data/types";
 
-// Map IDs to files
+// ✅ Map IDs to files
 const lessons: Record<string, Module> = {
   "unit-1": lesson1,
   "unit-2": lesson2,
@@ -33,10 +33,7 @@ const openai = new OpenAI({
   },
 });
 
-console.log('OpenRouter API Key exists:', !!process.env.OPENROUTER_API_KEY);
-console.log('First 10 chars:', process.env.OPENROUTER_API_KEY?.substring(0, 10));
-
-// ✅ 3. Updated Helper: Convert raw Lesson Data into the String format your prompt needs
+// Helper: Convert raw Lesson Data into the System Prompt
 function formatSystemInstruction(lesson: Module): string {
   
   // -- A. Format Vocabulary --
@@ -122,9 +119,8 @@ DO NOT reveal your persona's name in the initial greeting - only reveal it when 
 - **Strict Error Catching:** You must catch ALL mistakes made by the user.
 - **Prioritization:**
   1. List the most CRITICAL errors first (grammar failures, wrong vocabulary).
-  2. Do not give direct correct answers to the user. Instead, quote their incorrect sentence/phrase/word, say the English meaning while hinting at the error, and encourage user to try answering again (e.g., "You typed [incorrect phrase in Chinese], I think you meant [correct phrase in English], but [explain mistake]. Can you try again?").
-  3. **Repeating Errors:** If the user made the same mistake multiple times, you MUST explicitly point this out 
-  4. If the list of errors is long (more than five mistakes), summarize the critical ones first.
+  2. **Repeating Errors:** If the user made the same mistake multiple times, you MUST explicitly point this out (e.g., "You repeatedly confused X with Y").
+  3. If the list of errors is long, summarize the critical ones first.
 - **"Show More" Feature:** If the user asks "Are there more errors?" or "Anything else?", list the minor issues you previously skipped.
 - **Language:** Deliver feedback primarily in English.
 - **Ending Rule:** When Feedback Mode ends, **DO NOT** ask to continue the conversation. Simply sign off or tell them they can start a new session when ready.
@@ -200,19 +196,9 @@ export async function registerRoutes(
 
   app.post(api.chat.sendMessage.path, async (req, res) => {
     try {
-      // ADD THESE DEBUG LOGS RIGHT HERE AT THE START
-      console.log('=== CHAT REQUEST DEBUG ===');
-      console.log('API Key exists:', !!process.env.OPENROUTER_API_KEY);
-      console.log('API Key length:', process.env.OPENROUTER_API_KEY?.length);
-      console.log('API Key first 15 chars:', process.env.OPENROUTER_API_KEY?.substring(0, 15));
-      console.log('Request body:', req.body);
-      console.log('========================');
-  
       const { message, unitId, history } = api.chat.sendMessage.input.parse(req.body);
-  
-      // ... rest of your existing code
 
-      // ✅ 4. Fetch the raw lesson data safely
+      // ✅ Fetch the raw lesson data safely
       const requestedId = unitId || "unit-1";
       const currentLesson = lessons[requestedId] || lesson1; // Fallback to lesson1 if ID not found
       
@@ -223,7 +209,7 @@ export async function registerRoutes(
       console.log("Vocab Count:", currentLesson.vocabulary?.length || 0);
       console.log("===========================");
       
-      // ✅ 5. Convert it to text for the AI
+      // ✅ Convert it to text for the AI
       const systemMessageContent = formatSystemInstruction(currentLesson);
 
       const recentHistory = (history || []).slice(-10).map(msg => ({

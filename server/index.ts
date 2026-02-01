@@ -1,3 +1,4 @@
+import { fileURLToPath } from "url";
 import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
@@ -60,7 +61,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- NEW SETUP LOGIC ---
+// --- APP SETUP ---
 let isSetup = false;
 async function setupApp() {
   if (isSetup) return;
@@ -74,20 +75,23 @@ async function setupApp() {
     console.error('Error:', err);
   });
 
-  if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
-    serveStatic(app);
-  } else {
+  // ✅ CORRECTED LOGIC: Use Vite in development, Static in production
+  if (process.env.NODE_ENV === "development") {
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
+  } else {
+    serveStatic(app);
   }
+  
   isSetup = true;
 }
 
 // Initialize setup immediately for Vercel
 setupApp().catch(console.error);
 
-// --- LOCAL SERVER START ---
-if (!process.env.VERCEL && require.main === module) {
+// --- START SERVER (CORRECTED) ---
+// This check replaces "require.main === module" to fix the crash
+if (!process.env.VERCEL && process.argv[1] === fileURLToPath(import.meta.url)) {
   const port = parseInt(process.env.PORT || "5001", 10);
   httpServer.listen(port, "0.0.0.0", () => {
     log(`serving on port ${port}`);

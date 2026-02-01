@@ -1,14 +1,10 @@
 {
-    "buildCommand": "npm run build",
-    "outputDirectory": "dist/public",
-    "rewrites": [
-      {
-        "source": "/api/(.*)",
-        "destination": "/api/server.cjs"
-      },
-      {
-        "source": "/(.*)",
-        "destination": "/api/server.cjs"
-      }
-    ]
-  }
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/server.cjs"
+    }
+  ]
+}
