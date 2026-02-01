@@ -42,4 +42,6 @@ export interface Module {
   conversations: Conversation[];
   patterns: Pattern[];
   grammar: GrammarSection[];
+  // 👇 ADD THIS LINE TO FIX THE ERROR
+  key_sentence_patterns?: Pattern[]; 
 }
