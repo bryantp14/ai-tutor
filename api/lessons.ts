@@ -1046,14 +1046,14 @@ const lesson5: Lesson = {
 
 
 // --- THE REGISTRY ---
-const lessons: Record<string, Lesson> = {
+// ... (Your lesson1, lesson2, lesson3 definitions are above this) ...
+
+// ✅ CRITICAL: This is what the server is looking for!
+// We combine all your separate variables into one big exported object.
+export const lessons: Record<string, Lesson> = {
     "unit-1": lesson1,
     "unit-2": lesson2,
-    "unit-3": lesson3,
-    "unit-4": lesson4,
-    "unit-5": lesson5,
-};
-  
-  export function getLessonData(unitId: string) {
-    return lessons[unitId] || lesson1;
-  }
+    "unit-3": lesson3, // Uncomment this if you have a lesson3 defined
+    "unit-4": lesson4, // Uncomment this if you have a lesson4 defined
+    "unit-5": lesson5  // Uncomment this if you have a lesson5 defined
+  };
