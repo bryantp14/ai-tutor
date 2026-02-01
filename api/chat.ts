@@ -1,138 +1,65 @@
 import { lessons } from "./lessons";
 import OpenAI from "openai";
 
-// Initialize OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: "https://openrouter.ai/api/v1",
-  defaultHeaders: {
-    "X-Title": "My Chinese Tutor App",
-  },
-});
-
-// --- YOUR SPECIAL PROMPT LOGIC ---
-function formatSystemInstruction(lesson: any): string {
-  const vocab = lesson.vocabulary || [];
-  const grammar = lesson.grammar || [];
-  const patterns = lesson.patterns || [];
-
-  const vocabList = vocab.length > 0 
-    ? vocab.map((v: any) => `${v.word} (${v.pinyin}) - ${v.english}`).join("\n")
-    : "None";
-
-  const grammarList = grammar.length > 0 ? grammar.map((g: any) => {
-    const points = (g.points || []).map((p: any) => {
-      const exStr = (p.examples || []).map((ex: any) => {
-        return typeof ex === 'string' ? `   * ${ex}` : `   * ${ex.statement || ''}`;
-      }).join("\n");
-      return `**${p.structure || 'Rule'}**\nUsage: ${p.usage || ''}\nExamples:\n${exStr}`;
-    }).join("\n\n");
-    return `### Topic: ${g.topic}\n${points}`;
-  }).join("\n\n") : "No grammar specified";
-
-  const patternList = patterns.length > 0 ? patterns.map((p: any) => 
-    `Function: ${p.function}\nPatterns:\n${(p.patterns || []).map((s: string) => `- ${s}`).join("\n")}`
-  ).join("\n\n") : "None specified";
-
-  return `# YOUR ROLE AND PURPOSE
-You are an AI language tutor for conversational Chinese.
-
-## CRITICAL CONSTRAINTS
-**THIS IS THE MOST IMPORTANT RULE**: You MUST ONLY use vocabulary and grammar from the current lesson below.
-
-### CURRENT LESSON: ${lesson.title || "General Chat"}
-
-### ALLOWED VOCABULARY:
-${vocabList}
-
-### ALLOWED GRAMMAR:
-${grammarList}
-
-### ALLOWED PATTERNS:
-${patternList}
-
-## PERSONA SYSTEM
-You must randomly select ONE persona at the start:
-- 李友 (female student from NY)
-- 王朋 (male student from Beijing)  
-- 高文中 (male student from UK)
-- 白英爱 (female foreigner)
-
-## CONVERSATION MODES
-### CHAT MODE (Default)
-- Output ONLY Chinese characters.
-- NO English, NO pinyin in the output (unless requested).
-- Track errors silently.
-
-### FEEDBACK MODE (Triggered by 'feedback' or repeated errors)
-- List mistakes in English.
-- Prioritize grammar and tone errors.
-- Do not ask to continue conversation after feedback.
-`;
-}
-
-// --- THE SERVER HANDLER ---
 export default async function handler(req: any, res: any) {
-  // Only allow POST requests
+  // 1. Basic Setup Check
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
   }
 
   try {
-    const { message, unitId, history } = req.body;
-
-    // 1. Load the Lesson (With TypeScript safety fixes)
-    const allLessons = lessons as any; 
-    const requestedId = unitId || "unit-1";
-    let currentLesson = allLessons[requestedId];
-
-    // Fallback search if direct key lookup fails
-    if (!currentLesson && Array.isArray(allLessons)) {
-      currentLesson = allLessons.find((l: any) => l.id === requestedId);
-    }
-    // Ultimate fallback
-    if (!currentLesson) {
-       currentLesson = allLessons["unit-1"] || Object.values(allLessons)[0];
+    // 2. DIAGNOSTIC: Check API Key immediately
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+      throw new Error("CRITICAL: OPENROUTER_API_KEY is missing from Vercel Environment Variables.");
     }
 
-    if (!currentLesson) {
-       // Create a dummy lesson to prevent crash if data is totally missing
-       currentLesson = { title: "Basic Chat", vocabulary: [], grammar: [] };
+    // 3. DIAGNOSTIC: Check Lessons Data
+    if (!lessons) {
+      throw new Error("CRITICAL: 'lessons' failed to import. Check api/lessons.ts.");
     }
-
-    // 2. Prepare Messages
-    const systemPrompt = formatSystemInstruction(currentLesson);
     
-    const recentHistory = (history || []).slice(-10).map((msg: any) => ({
-      role: msg.role === "user" ? "user" : "assistant",
-      content: msg.content
-    }));
+    // Check if the requested unit exists
+    const { message, unitId, history } = req.body;
+    const requestedId = unitId || "unit-1";
+    const currentLesson = lessons[requestedId];
 
-    const messages = [
-      { role: "system", content: systemPrompt },
-      ...recentHistory,
-      { role: "user", content: message }
-    ];
+    if (!currentLesson) {
+       // Just a warning, not a crash
+       console.warn(`Lesson ${requestedId} not found, defaulting...`);
+    }
 
-    // 3. Call OpenAI
+    // 4. Initialize OpenAI
+    const openai = new OpenAI({
+      apiKey: apiKey,
+      baseURL: "https://openrouter.ai/api/v1",
+      defaultHeaders: { "X-Title": "My Chinese Tutor App" },
+    });
+
+    // 5. Run the Chat
+    const systemPrompt = `You are a helpful Chinese Tutor. Current Lesson: ${currentLesson?.title || "General"}`;
+    
     const response = await openai.chat.completions.create({
       model: "openai/gpt-4o",
-      messages: messages as any,
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...(history || []),
+        { role: "user", content: message }
+      ] as any,
     });
 
-    const aiContent = response.choices[0].message.content || "Sorry, I couldn't understand that.";
+    const aiContent = response.choices[0].message.content || "No response generated.";
 
-    // 4. Send Response
-    return res.status(200).json({
-      message: aiContent,
-      role: "assistant"
-    });
+    return res.status(200).json({ message: aiContent, role: "assistant" });
 
   } catch (error: any) {
-    console.error("API Error:", error);
-    return res.status(500).json({ 
-      message: "Internal Server Error", 
-      error: error.message 
+    console.error("SERVER CRASH:", error);
+    
+    // THIS IS THE FIX: Instead of 500, return the error as a chat message
+    // so you can see exactly what is wrong in the UI.
+    return res.status(200).json({ 
+      message: `❌ SYSTEM ERROR: ${error.message}`, 
+      role: "assistant" 
     });
   }
 }
