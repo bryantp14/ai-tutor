@@ -3,7 +3,7 @@ import { Layout } from "@/components/Layout";
 import { ChatMessage } from "@/components/ChatMessage";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { SendHorizontal, Mic, Sparkles, Download, AlertTriangle, Trash2 } from "lucide-react"; // ✅ UPDATED: Removed FileText
+import { SendHorizontal, Mic, Sparkles, Download, AlertTriangle, Trash2 } from "lucide-react";
 import { useChat } from "@/hooks/use-chat";
 import { useToast } from "@/hooks/use-toast";
 import { v4 as uuidv4 } from "uuid";
@@ -31,6 +31,7 @@ const INITIAL_GREETING: Message = {
 };
 
 export default function Home() {
+  // We keep "lesson-1" here so the Sidebar UI highlights correctly
   const [currentUnit, setCurrentUnit] = useState("lesson-1");
   const [messages, setMessages] = useState<Message[]>([INITIAL_GREETING]);
   const [inputValue, setInputValue] = useState("");
@@ -154,10 +155,14 @@ export default function Home() {
     const newHistory = [...messages, { role: "user" as const, content: userMessage }];
     setMessages(newHistory);
 
+    // ✅ FIX: Translate Frontend ID ("lesson-1") to Backend ID ("unit-1")
+    // This ensures the sidebar stays highlighted, but the server gets the correct data key.
+    const backendUnitId = currentUnit.replace("lesson", "unit");
+
     try {
       const response = await chatMutation.mutateAsync({
         message: userMessage,
-        unitId: currentUnit,
+        unitId: backendUnitId, // <--- Using the translated ID
         history: messages.map(m => ({ role: m.role, content: m.content }))
       });
 
