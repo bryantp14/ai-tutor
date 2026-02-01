@@ -1,7 +1,22 @@
-import { getLessonContext } from "./data/index";
 import OpenAI from "openai";
 
-// 1. Initialize OpenAI / OpenRouter
+// --- 1. EMBEDDED DATA (The "Brain") ---
+// We put the lesson data right here so it can't get lost.
+const lesson1 = {
+  id: "unit-1",
+  title: "Lesson 1: Greetings and Introductions",
+  vocabList: "你 (you), 好 (good), 请 (please), 问 (ask), 贵 (honorable), 姓 (surname), 我 (I/me), 呢 (particle), 小姐 (Miss), 叫 (to be called), 什么 (what), 名字 (name), 先生 (Mr.)",
+  grammarList: "Pronoun + 姓 (surname), Pronoun + 叫 (name), Subject + 是 (is/am/are) + noun",
+  patterns: "你/您好! (Hello), 你贵姓? (Your surname?), 我姓... (My surname is...), 你叫什么名字? (What is your name?)"
+};
+
+// Simple helper to pick the lesson
+function getLessonData(unitId: string) {
+  // In the future, we can add 'if (unitId === "unit-2") ...'
+  return lesson1; 
+}
+
+// --- 2. THE SERVER SETUP ---
 const apiKey = process.env.OPENAI_API_KEY || process.env.OPENROUTER_API_KEY;
 const baseURL = process.env.OPENROUTER_API_KEY ? "https://openrouter.ai/api/v1" : undefined;
 
@@ -11,7 +26,7 @@ const openai = new OpenAI({
 });
 
 export default async function handler(req: any, res: any) {
-  // --- A. CORS Headers (Essential for Vercel) ---
+  // CORS Headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -25,47 +40,38 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  // --- B. Validation ---
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
   if (!apiKey) {
-    return res.status(500).json({ error: "Missing API Key in Environment Variables" });
+    return res.status(500).json({ error: "Missing API Key configuration" });
   }
 
-  // --- C. The Logic ---
   try {
-    // 1. Get the User's input AND the Unit ID (e.g., "lesson-1")
     const { message, history, unitId } = req.body;
 
-    // 2. Retrieve the specific lesson data from your data folder
-    // We default to "lesson-1" if the frontend forgets to send an ID
-    const lessonContext = getLessonContext(unitId || "unit-1");
+    // Load the embedded data
+    const lesson = getLessonData(unitId || "unit-1");
 
-    console.log(`Processing message for unit: ${unitId}`);
-    console.log(`Topic: ${lessonContext.topic}`);
+    console.log(`Using Lesson: ${lesson.title}`);
 
-    // 3. Build the "Brain" (System Prompt)
-    // This tells the AI exactly what to teach based on your files.
     const systemPrompt = `
       You are a specialized Chinese language tutor.
       
-      CURRENT LESSON CONTEXT:
-      - Topic: ${lessonContext.topic}
-      - Vocabulary to prioritize: ${lessonContext.vocabList}
-      - Grammar points to reinforce: ${lessonContext.grammarList}
-      - Key Sentence Patterns: ${lessonContext.patterns}
+      CURRENT LESSON: ${lesson.title}
+      VOCABULARY: ${lesson.vocabList}
+      GRAMMAR: ${lesson.grammarList}
+      SENTENCE PATTERNS: ${lesson.patterns}
 
       INSTRUCTIONS:
       1. Engage in conversation related to the Topic.
       2. Prioritize using the vocabulary listed above.
       3. If the user makes a mistake, gently correct them using the grammar points listed.
-      4. Keep responses concise (under 3 sentences) to encourage conversation.
-      5. Speak mostly in Chinese, but use English for explanations if the user seems confused.
+      4. Keep responses short (under 3 sentences).
+      5. Speak mostly in Chinese (Simplified), but use English for explanations if needed.
     `;
 
-    // 4. Send to AI
     const messages = [
       { role: "system", content: systemPrompt },
       ...(history || []),
@@ -77,12 +83,15 @@ export default async function handler(req: any, res: any) {
       messages: messages as any,
     });
 
-    const reply = completion.choices[0].message.content;
-
-    return res.status(200).json({ message: reply });
+    return res.status(200).json({ 
+      message: completion.choices[0].message.content 
+    });
 
   } catch (error: any) {
-    console.error("AI Error:", error);
-    return res.status(500).json({ error: "Error communicating with AI", details: error.message });
+    console.error("Handler Error:", error);
+    return res.status(500).json({ 
+      error: "Error processing request", 
+      details: error.message 
+    });
   }
 }
