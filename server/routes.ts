@@ -8,9 +8,8 @@ import { systemInstruction } from "./systemInstruction";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerImageRoutes } from "./replit_integrations/image";
 
-// ✅ FIX: Import the function from our new Registry
-// We don't need to import individual lessons anymore!
-import { getLessonData } from "../api/lessons";
+// Import the lessons object directly
+import { lessons } from "../api/lessons";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY, 
@@ -20,8 +19,7 @@ const openai = new OpenAI({
   },
 });
 
-// Helper: Convert raw Lesson Data into the System Prompt
-// We use 'any' for the type here to avoid conflicts between 'Module' and 'Lesson' types
+// --- SYSTEM PROMPT GENERATOR ---
 function formatSystemInstruction(lesson: any): string {
   
   // -- A. Format Vocabulary --
@@ -31,25 +29,23 @@ function formatSystemInstruction(lesson: any): string {
     : "ERROR: NO VOCABULARY LOADED";
 
   // -- B. Format Grammar --
-  const grammarList = lesson.grammar.map((g: any) => {
+  const grammarList = lesson.grammar ? lesson.grammar.map((g: any) => {
     const points = g.points.map((p: any) => {
-      // Handle examples safely
       const exStr = p.examples ? p.examples.map((ex: any) => {
         if (typeof ex === 'string') return `   * ${ex}`;
         return `   * Q: ${ex.question || ''} A: ${ex.answer || ''} (St: ${ex.statement || ''})`;
       }).join("\n") : "";
-
       return `**${p.structure || 'Rule'}**\nUsage: ${p.usage || ''}\nExamples:\n${exStr}`;
     }).join("\n\n");
     return `### Topic: ${g.topic}\n${points}`;
-  }).join("\n\n") || "No grammar specified";
+  }).join("\n\n") : "No grammar specified";
 
   // -- C. Format Patterns --
   const patternList = lesson.patterns?.map((p: any) => 
     `Function: ${p.function}\nPatterns:\n${p.patterns.map((s: string) => `- ${s}`).join("\n")}`
   ).join("\n\n") || "None specified";
 
-  // -- D. Build the Final Prompt --
+  // -- D. Build Final Prompt --
   return `# YOUR ROLE AND PURPOSE
 You are an AI language tutor for conversational Chinese.
 
@@ -184,21 +180,25 @@ export async function registerRoutes(
 
   app.post(api.chat.sendMessage.path, async (req, res) => {
     try {
-      // ✅ Parse body - make sure shared/routes.ts includes unitId in the schema!
       const { message, unitId, history } = api.chat.sendMessage.input.parse(req.body);
 
-      // ✅ FIX: Use the Registry Function
-      // This guarantees we get the data from api/lessons.ts
+      // ✅ FIX: TypeScript Error Resolution
+      // We cast 'lessons' to 'any' so we can access it using a string index without TS complaining.
       const requestedId = unitId || "unit-1";
-      const currentLesson = getLessonData(requestedId);
+      const allLessons = lessons as any; 
       
-      // DEBUG: Log to server console to verify it works
+      const currentLesson = allLessons[requestedId] || allLessons["unit-1"];
+      
+      // DEBUG LOGGING - Check your server console!
       console.log("=== LESSON CONTEXT DEBUG ===");
-      console.log("Unit ID:", requestedId);
-      console.log("Topic:", currentLesson.title);
-      console.log("Vocab Count:", currentLesson.vocabulary?.length || 0);
+      console.log("Requested ID:", requestedId);
+      console.log("Found Lesson:", currentLesson?.title);
       console.log("===========================");
       
+      if (!currentLesson) {
+         throw new Error("Lesson could not be loaded");
+      }
+
       const systemMessageContent = formatSystemInstruction(currentLesson);
 
       const recentHistory = (history || []).slice(-10).map((msg: any) => ({
@@ -225,7 +225,6 @@ export async function registerRoutes(
         role: "assistant"
       });
 
-      // Optional: Save to sheet if configured
       if (typeof appendToSheet === 'function') {
         await appendToSheet({
             unit: unitId || "unit-1",

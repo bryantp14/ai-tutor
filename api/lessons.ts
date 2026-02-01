@@ -5,32 +5,30 @@
 
 // --- 1. UPDATED INTERFACES ---
 
-interface Vocab { 
+export interface Vocab { 
     word: string; 
     pinyin: string; 
     english: string; 
   }
   
-  // ✅ UPDATE: Added 'note' (optional)
-  interface GrammarPoint { 
+  export interface GrammarPoint { 
     structure: string; 
     usage?: string; 
     examples?: any[]; 
     note?: string; 
   }
   
-  interface Grammar { 
+  export interface Grammar { 
     topic: string; 
     points: GrammarPoint[]; 
   }
   
-  interface Pattern { 
+  export interface Pattern { 
     function: string; 
     patterns: string[]; 
   }
   
-  // ✅ NEW: Define the structure of a dialogue line
-  interface DialogueLine {
+  export interface DialogueLine {
     speaker: string;
     chinese: string;
     pinyin: string;
@@ -38,22 +36,21 @@ interface Vocab {
     function: string;
   }
   
-  // ✅ NEW: Define the structure of a Conversation
-  interface Conversation {
+  export interface Conversation {
     title: string;
     context: string;
     dialogue: DialogueLine[];
   }
   
-  // ✅ UPDATE: Added 'conversations' to the Lesson type
-  interface Lesson { 
+  export interface Lesson { 
     id: string; 
     title: string; 
     vocabulary: Vocab[]; 
     grammar: Grammar[]; 
     patterns: Pattern[]; 
-    conversations?: Conversation[]; // The '?' means it is optional (some lessons might not have it)
+    conversations?: Conversation[];
   }
+  
   
   // --- Your lesson1, lesson2 data follows below ... ---
 

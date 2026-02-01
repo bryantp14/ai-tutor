@@ -1,97 +1,164 @@
 import OpenAI from "openai";
+// We import the specific types. 
+// Ensure your api/lessons.ts exports 'lessons' as the Record object we created earlier.
+import { lessons, Lesson } from "../api/lessons";
 
-// --- 1. EMBEDDED DATA (The "Brain") ---
-// We put the lesson data right here so it can't get lost.
-const lesson1 = {
-  id: "unit-1",
-  title: "Lesson 1: Greetings and Introductions",
-  vocabList: "你 (you), 好 (good), 请 (please), 问 (ask), 贵 (honorable), 姓 (surname), 我 (I/me), 呢 (particle), 小姐 (Miss), 叫 (to be called), 什么 (what), 名字 (name), 先生 (Mr.)",
-  grammarList: "Pronoun + 姓 (surname), Pronoun + 叫 (name), Subject + 是 (is/am/are) + noun",
-  patterns: "你/您好! (Hello), 你贵姓? (Your surname?), 我姓... (My surname is...), 你叫什么名字? (What is your name?)"
-};
+// --------------------
+// OpenAI / OpenRouter Configuration
+// --------------------
+const apiKey =
+  process.env.OPENAI_API_KEY || process.env.OPENROUTER_API_KEY;
 
-// Simple helper to pick the lesson
-function getLessonData(unitId: string) {
-  // In the future, we can add 'if (unitId === "unit-2") ...'
-  return lesson1; 
-}
-
-// --- 2. THE SERVER SETUP ---
-const apiKey = process.env.OPENAI_API_KEY || process.env.OPENROUTER_API_KEY;
-const baseURL = process.env.OPENROUTER_API_KEY ? "https://openrouter.ai/api/v1" : undefined;
+const baseURL = process.env.OPENROUTER_API_KEY
+  ? "https://openrouter.ai/api/v1"
+  : undefined;
 
 const openai = new OpenAI({
-  apiKey: apiKey,
-  baseURL: baseURL,
+  apiKey,
+  baseURL,
 });
 
-export default async function handler(req: any, res: any) {
-  // CORS Headers
-  res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-  );
+// --------------------
+// Helper: Find lesson (ROBUST VERSION)
+// --------------------
+function getLessonByUnitId(unitId: string): Lesson {
+  // 1. Try to find the lesson in the registry object
+  // (We use bracket notation because 'lessons' is a Record/Object, not an array)
+  const lesson = lessons[unitId];
 
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+  // 2. Fallback if not found
+  if (!lesson) {
+    console.warn(`⚠️ Unknown unitId received: ${unitId}. Falling back to unit-1.`);
+    return lessons["unit-1"] || Object.values(lessons)[0];
   }
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
+  return lesson;
+}
+
+// --------------------
+// Helper: Build system prompt (CRASH-PROOF VERSION)
+// --------------------
+function buildSystemPrompt(lesson: Lesson): string {
+  // ✅ FIX: specific check for vocabulary existence
+  const vocab = (lesson.vocabulary || [])
+    .map(v => `${v.word} (${v.pinyin}): ${v.english}`)
+    .join("; ");
+
+  // ✅ FIX: specific check for conversations existence
+  // This was causing your error: "lesson.conversations is undefined"
+  const conversationSamples = (lesson.conversations || [])
+    .map(conv =>
+      `CONTEXT: ${conv.context}\n` +
+      conv.dialogue
+        .map(d => `${d.speaker}: ${d.chinese}`)
+        .join("\n")
+    )
+    .join("\n\n");
+
+  // ✅ FIX: specific check for grammar existence
+  const grammarPoints = (lesson.grammar || [])
+    .map(g =>
+      `${g.topic}\n` +
+      g.points
+        .map(p =>
+          `• ${p.structure} — ${p.usage ?? ""}\n` +
+          (p.examples
+            // Check if examples exists, and handle both string and object formats
+            ? p.examples.map(e => typeof e === 'string' ? `  - ${e}` : `  - ${e.statement}`).join("\n") 
+            : "")
+        )
+        .join("\n")
+    )
+    .join("\n\n");
+
+  // ✅ FIX: specific check for patterns existence
+  const patterns = (lesson.patterns || [])
+    .map(p =>
+      `${p.function}:\n` +
+      p.patterns.map(pt => `- ${pt}`).join("\n")
+    )
+    .join("\n\n");
+
+  return `
+You are a highly structured Chinese language tutor.
+
+LESSON TOPIC: ${lesson.title}
+
+VOCABULARY (prioritize usage):
+${vocab || "None specified"}
+
+GRAMMAR RULES (enforce and correct gently):
+${grammarPoints || "None specified"}
+
+SENTENCE PATTERNS (reuse naturally):
+${patterns || "None specified"}
+
+SAMPLE CONVERSATIONS (model tone and structure):
+${conversationSamples || "None specified"}
+
+INSTRUCTIONS:
+1. Speak mostly in Simplified Chinese.
+2. Keep responses concise (1–3 sentences).
+3. Use lesson vocabulary and grammar whenever possible.
+4. If the user makes a mistake, gently correct it and explain briefly.
+5. Stay within the lesson scope unless the user explicitly asks otherwise.
+`;
+}
+
+// --------------------
+// API Handler
+// --------------------
+export default async function handler(req: any, res: any) {
+  // CORS Headers
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method Not Allowed" });
   }
 
   if (!apiKey) {
-    return res.status(500).json({ error: "Missing API Key configuration" });
+    return res.status(500).json({ error: "Missing API key" });
   }
 
   try {
-    const { message, history, unitId } = req.body;
+    const { message, history = [], unitId } = req.body;
 
-    // Load the embedded data
-    const lesson = getLessonData(unitId || "unit-1");
+    if (!message) {
+      return res.status(400).json({ error: "Missing message" });
+    }
 
-    console.log(`Using Lesson: ${lesson.title}`);
+    // Use our safe lookup helper
+    const lesson = getLessonByUnitId(unitId || "unit-1");
+    console.log(`Using Lesson: ${lesson.title} (ID: ${unitId})`);
 
-    const systemPrompt = `
-      You are a specialized Chinese language tutor.
-      
-      CURRENT LESSON: ${lesson.title}
-      VOCABULARY: ${lesson.vocabList}
-      GRAMMAR: ${lesson.grammarList}
-      SENTENCE PATTERNS: ${lesson.patterns}
-
-      INSTRUCTIONS:
-      1. Engage in conversation related to the Topic.
-      2. Prioritize using the vocabulary listed above.
-      3. If the user makes a mistake, gently correct them using the grammar points listed.
-      4. Keep responses short (under 3 sentences).
-      5. Speak mostly in Chinese (Simplified), but use English for explanations if needed.
-    `;
+    const systemPrompt = buildSystemPrompt(lesson);
 
     const messages = [
       { role: "system", content: systemPrompt },
-      ...(history || []),
+      ...history,
       { role: "user", content: message }
     ];
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // Or "google/gemini-2.0-flash-001"
+      model: "gpt-4o-mini", // Use "gpt-4o" if your key supports it for better reasoning
       messages: messages as any,
     });
 
-    return res.status(200).json({ 
-      message: completion.choices[0].message.content 
+    return res.status(200).json({
+      message: completion.choices[0].message.content,
     });
 
-  } catch (error: any) {
-    console.error("Handler Error:", error);
-    return res.status(500).json({ 
-      error: "Error processing request", 
-      details: error.message 
+  } catch (err: any) {
+    console.error("Chat API Error:", err);
+    return res.status(500).json({
+      error: "Internal Server Error",
+      details: err.message,
     });
   }
 }
