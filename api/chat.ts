@@ -1,4 +1,4 @@
-import { getLessonContext } from "../server/data/index";
+import { getLessonContext } from "./data/index";
 import OpenAI from "openai";
 
 // 1. Initialize OpenAI / OpenRouter

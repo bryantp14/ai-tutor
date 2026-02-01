@@ -9,12 +9,12 @@ import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerImageRoutes } from "./replit_integrations/image";
 
 // ✅ Import all lesson data (Lessons 1-5)
-import { lesson1 } from "./data/lesson1"; 
-import { lesson2 } from "./data/lesson2"; 
-import { lesson3 } from "./data/lesson3"; 
-import { lesson4 } from "./data/lesson4"; 
-import { lesson5 } from "./data/lesson5";
-import { Module } from "./data/types";
+import { lesson1 } from "../api/data/lesson1"; 
+import { lesson2 } from "../api/data/lesson2"; 
+import { lesson3 } from "../api/data/lesson3"; 
+import { lesson4 } from "../api/data/lesson4"; 
+import { lesson5 } from "../api/data/lesson5";
+import { Module } from "../api/data/types";
 
 // ✅ Map IDs to files
 const lessons: Record<string, Module> = {
