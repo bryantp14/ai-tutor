@@ -8,7 +8,7 @@ import { systemInstruction } from "./systemInstruction";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerImageRoutes } from "./replit_integrations/image";
 
-// Import the lessons object directly
+// Import the lessons data
 import { lessons } from "../api/lessons";
 
 const openai = new OpenAI({
@@ -18,6 +18,21 @@ const openai = new OpenAI({
     "X-Title": "My Chinese Tutor App",
   },
 });
+
+// ✅ FIX: Robust Lesson Lookup Helper
+// This handles BOTH Arrays (list) and Objects (dictionary) to prevent crashes.
+function findLesson(requestedId: string): any {
+  // If 'lessons' is an Array (using .find)
+  if (Array.isArray(lessons)) {
+    const found = lessons.find((l: any) => l.id === requestedId);
+    if (found) return found;
+    return lessons.find((l: any) => l.id === "unit-1") || lessons[0];
+  }
+
+  // If 'lessons' is an Object (using Key lookup)
+  const lessonsRecord = lessons as any;
+  return lessonsRecord[requestedId] || lessonsRecord["unit-1"] || Object.values(lessonsRecord)[0];
+}
 
 // --- SYSTEM PROMPT GENERATOR ---
 function formatSystemInstruction(lesson: any): string {
@@ -182,17 +197,15 @@ export async function registerRoutes(
     try {
       const { message, unitId, history } = api.chat.sendMessage.input.parse(req.body);
 
-      // ✅ FIX: TypeScript Error Resolution
-      // We cast 'lessons' to 'any' so we can access it using a string index without TS complaining.
+      // ✅ FIX: Use Robust Lookup
       const requestedId = unitId || "unit-1";
-      const allLessons = lessons as any; 
+      const currentLesson = findLesson(requestedId);
       
-      const currentLesson = allLessons[requestedId] || allLessons["unit-1"];
-      
-      // DEBUG LOGGING - Check your server console!
+      // DEBUG LOGGING
       console.log("=== LESSON CONTEXT DEBUG ===");
       console.log("Requested ID:", requestedId);
       console.log("Found Lesson:", currentLesson?.title);
+      console.log("Data Type:", Array.isArray(lessons) ? "Array" : "Object");
       console.log("===========================");
       
       if (!currentLesson) {
